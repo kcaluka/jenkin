@@ -1,36 +1,39 @@
 pipeline {
-    agent any
-    parameters {
-        string(name:'Greeting', defaultValue:'Hello', description:'How should I greet the world?')
-    }
-    stages {
-        stage('Example') {
-            steps {
-                echo "${params.Greeting} Welcome to Jenkins World!"
-            }
-        }
-    }
-}
-pipeline {
-    agent {
-        docker {
-            image 'maven:3-alpine'
-            args '-v /root/.m2:/root/.m2'
-        }
-    }
+    agent none
     stages {
         stage('Build') {
+            agent any
             steps {
-                sh 'mvn -B -DskipTests clean package'
+                checkout scm
+                sh 'make'
+                stash includes: '**/target/*.jar', name: 'app'
             }
         }
-        stage('Test') { 
+        stage('Test on Linux') {
+            agent { 
+                label 'linux'
+            }
             steps {
-                sh 'mvn test'
+                unstash 'app'
+                sh 'make check'
             }
             post {
                 always {
-                    junit 'target/surefire-reports/*.xml'
+                    junit '**/target/*.xml'
+                }
+            }
+        }
+        stage('Test on Windows') {
+            agent {
+                label 'windows'
+            }
+            steps {
+                unstash 'app'
+                bat 'make check'
+            }
+            post {
+                always {
+                    junit '**/target/*.xml'
                 }
             }
         }
